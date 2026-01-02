@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: bench_postgres
+    environment:
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: bench123
+      POSTGRES_DB: benchdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bench -d benchdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: benchmark-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin1234
+      DOCKER_INFLUXDB_INIT_ORG: perf
+      DOCKER_INFLUXDB_INIT_BUCKET: jmeter
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: admin-token
+      DOCKER_INFLUXDB_INIT_RETENTION: 7d
+    ports:
+      - "8086:8086"
+      - "2003:2003"
+    volumes:
+      - influx-data:/var/lib/influxdb2
+    networks:
+      - benchmark-net
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: benchmark-prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - benchmark-net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: benchmark-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - benchmark-net
+
+volumes:
+  pgdata:
+  influx-data:
+  grafana-data:
+
+networks:
+  benchmark-net:
+    driver: bridge
