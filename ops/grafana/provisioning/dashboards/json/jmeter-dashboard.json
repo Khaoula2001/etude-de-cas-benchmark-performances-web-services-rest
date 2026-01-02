@@ -1,0 +1,75 @@
+{
+  "id": null,
+  "uid": "bench-jmeter",
+  "title": "Bench - JMeter (InfluxDB v2)",
+  "tags": ["bench", "jmeter", "influxdb"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {"type":"row","title":"Throughput & Errors","gridPos":{"h":1,"w":24,"x":0,"y":0}},
+    {
+      "type": "timeseries",
+      "title": "Requests per second",
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 1},
+      "datasource": {"type":"influxdb","uid":"InfluxDB-JMeter"},
+      "targets": [
+        {
+          "query": "from(bucket: \"jmeter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"request.count\")\n  |> aggregateWindow(every: 1s, fn: sum)\n  |> group(columns: [\"label\"])\n  |> yield(name: \"rps\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error rate (%)",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 1},
+      "datasource": {"type":"influxdb","uid":"InfluxDB-JMeter"},
+      "targets": [
+        {
+          "query": "from(bucket: \"jmeter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and (r._field == \"error.count\" or r._field == \"request.count\"))\n  |> aggregateWindow(every: 5s, fn: sum)\n  |> pivot(rowKey:[\"_time\"], columnKey:[\"_field\"], valueColumn:\"_value\")\n  |> map(fn: (r) => ({ r with error_rate: if exists r.error.count and exists r.request.count and r.request.count > 0 then (float(v: r.error.count) / float(v: r.request.count)) * 100.0 else 0.0 }))\n  |> keep(columns:[\"_time\", \"error_rate\"])\n  |> yield(name: \"err%\")",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {"type":"row","title":"Latency percentiles","gridPos":{"h":1,"w":24,"x":0,"y":9}},
+    {
+      "type": "timeseries",
+      "title": "p50 / p95 / p99 (ms)",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 10},
+      "datasource": {"type":"influxdb","uid":"InfluxDB-JMeter"},
+      "targets": [
+        {
+          "query": "from(bucket: \"jmeter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"elapsed\")\n  |> aggregateWindow(every: 10s, fn: quantile, q: 0.50, method: \"estimate_tdigest\")\n  |> map(fn: (r) => ({ r with _value: r._value }))\n  |> set(key:\"perc\", value:\"p50\")",
+          "refId": "P50"
+        },
+        {
+          "query": "from(bucket: \"jmeter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"elapsed\")\n  |> aggregateWindow(every: 10s, fn: quantile, q: 0.95, method: \"estimate_tdigest\")\n  |> map(fn: (r) => ({ r with _value: r._value }))\n  |> set(key:\"perc\", value:\"p95\")",
+          "refId": "P95"
+        },
+        {
+          "query": "from(bucket: \"jmeter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"elapsed\")\n  |> aggregateWindow(every: 10s, fn: quantile, q: 0.99, method: \"estimate_tdigest\")\n  |> map(fn: (r) => ({ r with _value: r._value }))\n  |> set(key:\"perc\", value:\"p99\")",
+          "refId": "P99"
+        }
+      ]
+    },
+
+    {"type":"row","title":"Details by label","gridPos":{"h":1,"w":24,"x":0,"y":19}},
+    {
+      "type": "table",
+      "title": "Summary (last 1m)",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 20},
+      "datasource": {"type":"influxdb","uid":"InfluxDB-JMeter"},
+      "targets": [
+        {
+          "query": "import \"influxdata/influxdb/schema\"\nlabelCounts = from(bucket: \"jmeter\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"request.count\")\n  |> group(columns: [\"label\"])\n  |> sum()\n\nerrors = from(bucket: \"jmeter\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"jmeter\" and r._field == \"error.count\")\n  |> group(columns: [\"label\"])\n  |> sum()\n\njoin(tables: {a: labelCounts, b: errors}, on: [\"label\"])\n  |> map(fn: (r) => ({ r with err_pct: if exists r._value_b and r._value_a > 0 then (float(v: r._value_b)/float(v: r._value_a))*100.0 else 0.0 }))\n  |> keep(columns: [\"label\", \"_value_a\", \"_value_b\", \"err_pct\"])\n  |> rename(columns: { _value_a: \"requests\", _value_b: \"errors\" })",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"}
+}

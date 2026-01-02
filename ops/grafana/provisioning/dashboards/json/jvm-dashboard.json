@@ -1,0 +1,95 @@
+{
+  "id": null,
+  "uid": "bench-jvm",
+  "title": "Bench - JVM (Micrometer)",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "tags": ["bench", "jvm", "prometheus"],
+  "panels": [
+    {
+      "type": "row",
+      "title": "CPU & Threads",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Process CPU %",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+      "targets": [
+        {
+          "expr": "avg by (instance, variant) (process_cpu_usage{job=~\"variant-.*\"}) * 100",
+          "refId": "A",
+          "legendFormat": "{{variant}} {{instance}}"
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Threads Actifs",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "targets": [
+        {
+          "expr": "avg by (instance, variant) (jvm_threads_live_threads{job=~\"variant-.*\"})",
+          "refId": "A",
+          "legendFormat": "{{variant}} live"
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+
+    {"type":"row","title":"Heap & GC","gridPos":{"h":1,"w":24,"x":0,"y":9}},
+    {
+      "type": "timeseries",
+      "title": "Heap Used (MiB)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+      "targets": [
+        {
+          "expr": "avg by (instance, variant) (jvm_memory_used_bytes{area=\"heap\",job=~\"variant-.*\"}) / 1024 / 1024",
+          "refId": "A",
+          "legendFormat": "{{variant}} used"
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Time (ms/s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{job=~\"variant-.*\"}[1m]) * 1000",
+          "refId": "A",
+          "legendFormat": "{{variant}} gc"
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    },
+
+    {"type":"row","title":"HikariCP","gridPos":{"h":1,"w":24,"x":0,"y":18}},
+    {
+      "type": "timeseries",
+      "title": "Hikari connexions actives / max",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 19},
+      "targets": [
+        {
+          "expr": "avg by (instance, variant) (hikaricp_connections_active{job=~\"variant-.*\"})",
+          "refId": "A",
+          "legendFormat": "{{variant}} active"
+        },
+        {
+          "expr": "avg by (instance, variant) (hikaricp_connections{pool=\"HikariPool-1\",job=~\"variant-.*\"})",
+          "refId": "B",
+          "legendFormat": "{{variant}} total"
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "Prometheus"}
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {"from": "now-15m", "to": "now"}
+}
